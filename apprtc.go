@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -11,22 +12,27 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/daozhao/apprtc-go/collider"
 	// "reflect"
 )
 
+/*
 const (
 	CERT        = "./mycert.pem"
 	KEY         = "./mycert.key"
 	wssHostPort = "8089"
 	wssHost     = "192.168.2.30"
 	PORT        = 8888
-	useTls      = true
 )
+*/
 
-var TURN_SERVER_OVERRIDE string = `[
+var TURN_SERVER_OVERRIDE string
+
+const TURN_SERVER_FMT = `[
 {
     "urls": [
-      "stun:192.168.2.170:3478"
+      "stun:%s"
     ]
   }
 ]`
@@ -47,6 +53,7 @@ var CALLSTATS_PARAMS string = `{"appSecret": "none", "appId": "none"}`
   'appSecret': os.environ.get('CALLSTATS_APP_SECRET')
 }`
 */
+/*
 var WSS_INSTANCE_HOST_KEY string = "host_port_pair"
 var WSS_INSTANCE_NAME_KEY string = "vm_name"
 var WSS_INSTANCE_ZONE_KEY string = "zone"
@@ -61,6 +68,7 @@ var WSS_INSTANCES string = `[{
     WSS_INSTANCE_NAME_KEY: 'wsserver-std-2',
     WSS_INSTANCE_ZONE_KEY: 'us-central1-f'
 }]`
+*/
 
 const (
 	RESPONSE_ERROR            = "ERROR"
@@ -190,7 +198,7 @@ func getWssParameters(r *http.Request) (string, string) {
 	if len(wssHostPortPair) == 0 {
 		log.Println("getWssParameters, r.Host:", r.Host)
 		wssHostPortPair = r.Host
-		wssHostPortPair = wssHost + ":" + wssHostPort // "192.168.2.30:8089"
+		wssHostPortPair = wssHost + ":" + strconv.Itoa(wssHostPort) // "192.168.2.30:8089"
 	}
 	// log.Println("r:",r)
 	// if strings.Index(r.Scheme,"http://") == 0 {
@@ -548,29 +556,56 @@ func getRoomParameters(r *http.Request, room_id, client_id string, is_initiator 
 	return data
 }
 
+var useTls bool
+var wssHostPort int
+var webHostPort int
+var wssHost string
+
+var flagUseTls = flag.Bool("tls", true, "whether TLS is used")
+var flagWssHostPort = flag.Int("wsport", 443, "The TCP port that the server listens on")
+var flagWebHostPort = flag.Int("webport", 8080, "The TCP port that the server listens on")
+var flagWssHost = flag.String("host", "192.168.2.30", "Enter your hostname or host ip")
+var flagstun = flag.String("stun", "192.168.2.170:3478", "Enter stun server ip:port")
+var roomSrv = flag.String("room-server", "https://appr.tc", "The origin of the room server")
+
+var CERT = flag.String("cert", "./mycert.pem", "cert pem file ")
+var KEY = flag.String("key", "./mycert.key", "cert key file ")
+
 func main() {
+	flag.Parse()
+	useTls = *flagUseTls
+	wssHostPort = *flagWssHostPort
+	webHostPort = *flagWebHostPort
+	wssHost = *flagWssHost
+
+	TURN_SERVER_OVERRIDE = fmt.Sprintf(TURN_SERVER_FMT, *flagstun)
+
+	log.Printf("Starting collider: tls = %t, port = %d, room-server=%s", useTls, wssHostPort, *roomSrv)
+	c := collider.NewCollider(*roomSrv)
+	go c.Run(wssHostPort, useTls, *CERT, *KEY)
 
 	RoomList = make(map[string]*Room)
-	http.Handle("/css/", http.FileServer(http.Dir("./")))
-	http.Handle("/js/", http.FileServer(http.Dir("./")))
-	http.Handle("/images/", http.FileServer(http.Dir("./")))
-	http.Handle("/callstats/", http.FileServer(http.Dir("./")))
-	http.Handle("/favicon.ico", http.FileServer(http.Dir("./")))
-	http.Handle("/manifest.json", http.FileServer(http.Dir("./html/")))
+	WebServeMux := http.NewServeMux()
+	WebServeMux.Handle("/css/", http.FileServer(http.Dir("./")))
+	WebServeMux.Handle("/js/", http.FileServer(http.Dir("./")))
+	WebServeMux.Handle("/images/", http.FileServer(http.Dir("./")))
+	WebServeMux.Handle("/callstats/", http.FileServer(http.Dir("./")))
+	WebServeMux.Handle("/favicon.ico", http.FileServer(http.Dir("./")))
+	WebServeMux.Handle("/manifest.json", http.FileServer(http.Dir("./html/")))
 
-	http.HandleFunc("/r/", roomPageHandler)
-	http.HandleFunc("/join/", joinPageHandler)
-	http.HandleFunc("/leave/", leavePageHandler)
-	http.HandleFunc("/message/", messagePageHandler)
-	http.HandleFunc("/params/", paramsPageHandler)
-	http.HandleFunc("/a/", aPageHandler)
-	http.HandleFunc("/compute/", computePageHandler)
-	http.HandleFunc("/", mainPageHandler)
+	WebServeMux.HandleFunc("/r/", roomPageHandler)
+	WebServeMux.HandleFunc("/join/", joinPageHandler)
+	WebServeMux.HandleFunc("/leave/", leavePageHandler)
+	WebServeMux.HandleFunc("/message/", messagePageHandler)
+	WebServeMux.HandleFunc("/params/", paramsPageHandler)
+	WebServeMux.HandleFunc("/a/", aPageHandler)
+	WebServeMux.HandleFunc("/compute/", computePageHandler)
+	WebServeMux.HandleFunc("/", mainPageHandler)
 
 	var e error
 
-	pstr := ":" + strconv.Itoa(PORT)
-	log.Println("Starting webrtc demo on port:", PORT, " tls:", useTls)
+	pstr := ":" + strconv.Itoa(webHostPort)
+	log.Println("Starting webrtc demo on port:", webHostPort, " tls:", useTls)
 	if useTls {
 		config := &tls.Config{
 			// Only allow ciphers that support forward secrecy for iOS9 compatibility:
@@ -586,11 +621,11 @@ func main() {
 			},
 			PreferServerCipherSuites: true,
 		}
-		server := &http.Server{Addr: pstr, Handler: nil, TLSConfig: config}
+		server := &http.Server{Addr: pstr, Handler: WebServeMux, TLSConfig: config}
 
-		e = server.ListenAndServeTLS(CERT, KEY)
+		e = server.ListenAndServeTLS(*CERT, *KEY)
 	} else {
-		e = http.ListenAndServe(pstr, nil)
+		e = http.ListenAndServe(pstr, WebServeMux)
 	}
 
 	if e != nil {

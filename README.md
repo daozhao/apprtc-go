@@ -1,7 +1,13 @@
 # apprtc-go
-apprtc demo with golang.It's rewrite project WebRTC(https://github.com/webrtc/apprtc)  with golang
+apprtc demo with golang. It's rewrite project WebRTC(https://github.com/webrtc/apprtc)  with golang
 
-#How to run.
+# How to run.
+1. Setup the STUN server and run.
+coturn[https://github.com/coturn/coturn]
+```
+turnserver --no-auth --stun-only
+```
+2. Install apprtc-go and run.
 ```
 go install github.com/daozhao/apprtc-go
 $GOPATH/bin/apprtc-go -cert=$GOPATH/src/github.com/daozhao/apprtc-go/mycert.pem \
@@ -9,11 +15,13 @@ $GOPATH/bin/apprtc-go -cert=$GOPATH/src/github.com/daozhao/apprtc-go/mycert.pem 
                       -host=192.168.2.170 \
                       -stun=192.168.2.170:3478 \
                       -wsport=8089
+
 ```
 Open chrome and enter URL(https://192.168.2.170:8080).
 
 warnning:Replace the IP(192.168.2.170) with your real IP address
 
+# Help
 ```
 $GOPATH/bin/apprtc-go --help
 Usage of /home/daozhao/Documents/SourceCode/goPath/bin/apprtc-go:
@@ -34,4 +42,6 @@ Usage of /home/daozhao/Documents/SourceCode/goPath/bin/apprtc-go:
   -wsport int
     	The TCP port that the server listens on (default 443)
 ```
+
+
 

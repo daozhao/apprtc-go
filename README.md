@@ -9,8 +9,10 @@ turnserver --no-auth --stun-only
 ```
 2. Install apprtc-go and run.
 ```
-go install github.com/daozhao/apprtc-go
-$GOPATH/bin/apprtc-go -cert=$GOPATH/src/github.com/daozhao/apprtc-go/mycert.pem \
+go get github.com/daozhao/apprtc-go
+cd $GOPATH/src/github.com/daozhao/apprtc-go/
+go build -o apprtc-go apprtc.go
+./apprtc-go -cert=$GOPATH/src/github.com/daozhao/apprtc-go/mycert.pem \
                       -key=$GOPATH/src/github.com/daozhao/apprtc-go/mycert.key  \
                       -host=192.168.2.170 \
                       -stun=192.168.2.170:3478 \

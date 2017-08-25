@@ -29,13 +29,20 @@ const (
 
 var TURN_SERVER_OVERRIDE string
 
-const TURN_SERVER_FMT = `[
+const STUN_SERVER_FMT = `
 {
     "urls": [
       "stun:%s"
     ]
   }
-]`
+`
+const TURN_SERVER_FMT = `
+{
+    "urls": [
+      "turn:%stransport=udp"
+    ]
+  }
+`
 
 var TURN_BASE_URL string = "https://computeengineondemand.appspot.com"
 var TURN_URL_TEMPLATE string = `"%s/turn?username=%s&key=%s"`
@@ -565,7 +572,8 @@ var flagUseTls = flag.Bool("tls", true, "whether TLS is used")
 var flagWssHostPort = flag.Int("wsport", 443, "The TCP port that the server listens on")
 var flagWebHostPort = flag.Int("webport", 8080, "The TCP port that the server listens on")
 var flagWssHost = flag.String("host", "192.168.2.30", "Enter your hostname or host ip")
-var flagstun = flag.String("stun", "192.168.2.170:3478", "Enter stun server ip:port")
+var flagstun = flag.String("stun", "", "Enter stun server ip:port,for example 192.168.2.170:3478,default is null")
+var flagturn = flag.String("turn", "", "Enter turn server ip:port,for example 192.168.2.170:3478,default is null")
 var roomSrv = flag.String("room-server", "https://appr.tc", "The origin of the room server")
 
 var CERT = flag.String("cert", "./mycert.pem", "cert pem file ")
@@ -578,9 +586,21 @@ func main() {
 	webHostPort = *flagWebHostPort
 	wssHost = *flagWssHost
 
-	TURN_SERVER_OVERRIDE = fmt.Sprintf(TURN_SERVER_FMT, *flagstun)
-
 	log.Printf("Starting collider: tls = %t, port = %d, room-server=%s", useTls, wssHostPort, *roomSrv)
+
+	// TURN_SERVER_OVERRIDE += "["
+	if len(*flagstun) > 0 {
+		TURN_SERVER_OVERRIDE += fmt.Sprintf(STUN_SERVER_FMT, *flagstun)
+	}
+	if len(*flagturn) > 0 {
+		if len(TURN_SERVER_OVERRIDE) > 0 {
+			TURN_SERVER_OVERRIDE += ","
+		}
+		TURN_SERVER_OVERRIDE += fmt.Sprintf(TURN_SERVER_FMT, *flagturn)
+	}
+	TURN_SERVER_OVERRIDE = "[" + TURN_SERVER_OVERRIDE + "]"
+
+	log.Printf("TURN_SERVER_OVERRIDE:%s", TURN_SERVER_OVERRIDE)
 	c := collider.NewCollider(*roomSrv)
 	go c.Run(wssHostPort, useTls, *CERT, *KEY)
 

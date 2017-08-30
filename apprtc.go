@@ -1,7 +1,10 @@
 package main
 
 import (
+	"crypto/hmac"
+	"crypto/md5"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -12,6 +15,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/daozhao/apprtc-go/collider"
 	// "reflect"
@@ -39,8 +43,10 @@ const STUN_SERVER_FMT = `
 const TURN_SERVER_FMT = `
 {
     "urls": [
-      "turn:%stransport=udp"
-    ]
+      "turn:%s?transport=udp"
+    ],
+	"username": "%s",
+	"credential": "%s"
   }
 `
 
@@ -48,9 +54,9 @@ var TURN_BASE_URL string = "https://computeengineondemand.appspot.com"
 var TURN_URL_TEMPLATE string = `"%s/turn?username=%s&key=%s"`
 var CEOD_KEY string = "4080218913"
 
-var ICE_SERVER_BASE_URL string = "https://networktraversal.googleapis.com"
-var ICE_SERVER_URL_TEMPLATE string = `"%s/v1alpha/iceconfig?key=%s"`
-var ICE_SERVER_API_KEY string = "none" //os.environ.get('ICE_SERVER_API_KEY')
+var ICE_SERVER_BASE_URL string = "https://"
+var ICE_SERVER_URL_TEMPLATE string = `"https://%s:%d/iceconfig?key=%s"`
+var ICE_SERVER_API_KEY string = "4080218913" //os.environ.get('ICE_SERVER_API_KEY')
 
 var CALLSTATS_PARAMS string = `{"appSecret": "none", "appId": "none"}`
 
@@ -457,6 +463,43 @@ func paramsPageHandler(w http.ResponseWriter, r *http.Request) {
 func aPageHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("aPageHandler host:", r.Host, "url:", r.URL.RequestURI(), " path:", r.URL.Path, " raw query:", r.URL.RawQuery)
 }
+
+func iceconfigPageHandler(w http.ResponseWriter, r *http.Request) {
+
+	timestamp := time.Now().Unix() + 60*60
+	turnUsername := strconv.Itoa(int(timestamp)) + ":teninefingers"
+	// turnUsername = "1503989521:ninefingers"
+	// key := "4080218913"
+	// expectedMAC := hex.EncodeToString(mac.Sum(nil))
+	expectedMAC := Hmac(ICE_SERVER_API_KEY, turnUsername)
+
+	turnServer := ""
+	if len(*flagstun) > 0 {
+		turnServer += fmt.Sprintf(STUN_SERVER_FMT, *flagstun)
+	}
+	if len(turnServer) > 0 {
+		turnServer += ","
+	}
+	turnServer += fmt.Sprintf(TURN_SERVER_FMT, *flagturn, turnUsername, expectedMAC)
+	turnServer = `{"iceServers":[` + turnServer + "]}"
+	log.Println("turnServer:", turnServer)
+	var dat interface{}
+	if err := json.Unmarshal([]byte(turnServer), &dat); err != nil {
+		log.Println("json.Unmarshal error:", err)
+		return
+	}
+	// params :=
+	enc := json.NewEncoder(w)
+	enc.Encode(&dat)
+}
+
+func Hmac(key, data string) string {
+	hmac := hmac.New(md5.New, []byte(key))
+	hmac.Write([]byte(data))
+	return base64.StdEncoding.EncodeToString(hmac.Sum(nil))
+	// return base64.StdEncoding.EncodeToString(hmac.Sum([]byte("")))
+}
+
 func computePageHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("computePagehandler host:", r.Host, "url:", r.URL.RequestURI(), " path:", r.URL.Path, " raw query:", r.URL.RawQuery)
 }
@@ -506,8 +549,8 @@ func getRoomParameters(r *http.Request, room_id, client_id string, is_initiator 
 	}
 	data["turn_url"] = template.JS(fmt.Sprintf(TURN_URL_TEMPLATE, TURN_BASE_URL, username, CEOD_KEY))
 
-	ice_server_base_url := getRequest(r, "ts", ICE_SERVER_BASE_URL)
-	data["ice_server_url"] = template.JS(fmt.Sprintf(ICE_SERVER_URL_TEMPLATE, ice_server_base_url, ICE_SERVER_API_KEY))
+	// ice_server_base_url := getRequest(r, "ts", ICE_SERVER_BASE_URL)
+	data["ice_server_url"] = template.JS(fmt.Sprintf(ICE_SERVER_URL_TEMPLATE, wssHost, webHostPort, ICE_SERVER_API_KEY))
 
 	data["ice_server_transports"] = getRequest(r, "tt", "")
 
@@ -579,6 +622,8 @@ var roomSrv = flag.String("room-server", "https://appr.tc", "The origin of the r
 var CERT = flag.String("cert", "./mycert.pem", "cert pem file ")
 var KEY = flag.String("key", "./mycert.key", "cert key file ")
 
+var ice_server_url string
+
 func main() {
 	flag.Parse()
 	useTls = *flagUseTls
@@ -589,15 +634,15 @@ func main() {
 	log.Printf("Starting collider: tls = %t, port = %d, room-server=%s", useTls, wssHostPort, *roomSrv)
 
 	// TURN_SERVER_OVERRIDE += "["
-	if len(*flagstun) > 0 {
-		TURN_SERVER_OVERRIDE += fmt.Sprintf(STUN_SERVER_FMT, *flagstun)
-	}
-	if len(*flagturn) > 0 {
-		if len(TURN_SERVER_OVERRIDE) > 0 {
-			TURN_SERVER_OVERRIDE += ","
-		}
-		TURN_SERVER_OVERRIDE += fmt.Sprintf(TURN_SERVER_FMT, *flagturn)
-	}
+	// if len(*flagstun) > 0 {
+	// 	TURN_SERVER_OVERRIDE += fmt.Sprintf(STUN_SERVER_FMT, *flagstun)
+	// }
+	// if len(*flagturn) > 0 {
+	// 	if len(TURN_SERVER_OVERRIDE) > 0 {
+	// 		TURN_SERVER_OVERRIDE += ","
+	// 	}
+	// 	TURN_SERVER_OVERRIDE += fmt.Sprintf(TURN_SERVER_FMT, *flagturn)
+	// }
 	TURN_SERVER_OVERRIDE = "[" + TURN_SERVER_OVERRIDE + "]"
 
 	log.Printf("TURN_SERVER_OVERRIDE:%s", TURN_SERVER_OVERRIDE)
@@ -620,12 +665,15 @@ func main() {
 	WebServeMux.HandleFunc("/params/", paramsPageHandler)
 	WebServeMux.HandleFunc("/a/", aPageHandler)
 	WebServeMux.HandleFunc("/compute/", computePageHandler)
+	WebServeMux.HandleFunc("/iceconfig", iceconfigPageHandler)
+	WebServeMux.HandleFunc("/iceconfig/", iceconfigPageHandler)
 	WebServeMux.HandleFunc("/", mainPageHandler)
 
 	var e error
 
 	pstr := ":" + strconv.Itoa(webHostPort)
 	log.Println("Starting webrtc demo on port:", webHostPort, " tls:", useTls)
+	// log.Println("hmac:", Hmac("4080218913", "1503989521:ninefingers"))
 	if useTls {
 		config := &tls.Config{
 			// Only allow ciphers that support forward secrecy for iOS9 compatibility:

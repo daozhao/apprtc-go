@@ -2,7 +2,7 @@ package main
 
 import (
 	"crypto/hmac"
-	"crypto/md5"
+	"crypto/sha1"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -47,6 +47,14 @@ const TURN_SERVER_FMT = `
     ],
 	"username": "%s",
 	"credential": "%s"
+  }
+`
+const TURN_SERVER_FMT_TEST = `
+{
+    "urls": [
+      "turn:%s?transport=udp"
+    ],
+	"credential": "%s:%s"
   }
 `
 
@@ -468,19 +476,20 @@ func iceconfigPageHandler(w http.ResponseWriter, r *http.Request) {
 
 	timestamp := time.Now().Unix() + 60*60
 	turnUsername := strconv.Itoa(int(timestamp)) + ":teninefingers"
-	// turnUsername = "1503989521:ninefingers"
-	// key := "4080218913"
-	// expectedMAC := hex.EncodeToString(mac.Sum(nil))
 	expectedMAC := Hmac(ICE_SERVER_API_KEY, turnUsername)
 
 	turnServer := ""
 	if len(*flagstun) > 0 {
 		turnServer += fmt.Sprintf(STUN_SERVER_FMT, *flagstun)
 	}
-	if len(turnServer) > 0 {
-		turnServer += ","
+
+	if len(*flagturn) > 0 {
+		if len(turnServer) > 0 {
+			turnServer += ","
+		}
+		turnServer += fmt.Sprintf(TURN_SERVER_FMT, *flagturn, turnUsername, expectedMAC)
+		// turnServer += fmt.Sprintf(TURN_SERVER_FMT, *flagturn, "teninefingers", "4080218913")
 	}
-	turnServer += fmt.Sprintf(TURN_SERVER_FMT, *flagturn, turnUsername, expectedMAC)
 	turnServer = `{"iceServers":[` + turnServer + "]}"
 	log.Println("turnServer:", turnServer)
 	var dat interface{}
@@ -494,7 +503,11 @@ func iceconfigPageHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func Hmac(key, data string) string {
-	hmac := hmac.New(md5.New, []byte(key))
+	// https://stackoverflow.com/questions/30745153/turn-server-for-webrtc-with-rest-api-authentication?noredirect=1&lq=1
+	// key: my_secret
+	// user: 1433895918506:my_user_name
+	// 1Dj9XZ5fwvKS6YoQZOoORcFnXaI
+	hmac := hmac.New(sha1.New, []byte(key))
 	hmac.Write([]byte(data))
 	return base64.StdEncoding.EncodeToString(hmac.Sum(nil))
 	// return base64.StdEncoding.EncodeToString(hmac.Sum([]byte("")))
@@ -673,7 +686,8 @@ func main() {
 
 	pstr := ":" + strconv.Itoa(webHostPort)
 	log.Println("Starting webrtc demo on port:", webHostPort, " tls:", useTls)
-	// log.Println("hmac:", Hmac("4080218913", "1503989521:ninefingers"))
+	//    1Dj9XZ5fwvKS6YoQZOoORcFnXaI=
+	// log.Println("hmac:", Hmac("my_secret", "1433895918506:my_user_name"))
 	if useTls {
 		config := &tls.Config{
 			// Only allow ciphers that support forward secrecy for iOS9 compatibility:

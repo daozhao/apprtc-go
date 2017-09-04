@@ -474,10 +474,6 @@ func aPageHandler(w http.ResponseWriter, r *http.Request) {
 
 func iceconfigPageHandler(w http.ResponseWriter, r *http.Request) {
 
-	timestamp := time.Now().Unix() + 60*60
-	turnUsername := strconv.Itoa(int(timestamp)) + ":teninefingers"
-	expectedMAC := Hmac(ICE_SERVER_API_KEY, turnUsername)
-
 	turnServer := ""
 	if len(*flagstun) > 0 {
 		turnServer += fmt.Sprintf(STUN_SERVER_FMT, *flagstun)
@@ -487,7 +483,8 @@ func iceconfigPageHandler(w http.ResponseWriter, r *http.Request) {
 		if len(turnServer) > 0 {
 			turnServer += ","
 		}
-		turnServer += fmt.Sprintf(TURN_SERVER_FMT, *flagturn, turnUsername, expectedMAC)
+		username, password := getTurnAuth()
+		turnServer += fmt.Sprintf(TURN_SERVER_FMT, *flagturn, username, password)
 		// turnServer += fmt.Sprintf(TURN_SERVER_FMT, *flagturn, "teninefingers", "4080218913")
 	}
 	turnServer = `{"iceServers":[` + turnServer + "]}"
@@ -500,6 +497,17 @@ func iceconfigPageHandler(w http.ResponseWriter, r *http.Request) {
 	// params :=
 	enc := json.NewEncoder(w)
 	enc.Encode(&dat)
+}
+
+func getTurnAuth() (username, password string) {
+	if len(*flagTurnSecret) > 0 {
+		timestamp := time.Now().Unix() + 60*60
+		turnUsername := strconv.Itoa(int(timestamp)) + ":" + *flagTurnUser
+		expectedMAC := Hmac(*flagTurnSecret, turnUsername)
+		return turnUsername, expectedMAC
+	}
+
+	return *flagTurnUser, *flagTurnPassword
 }
 
 func Hmac(key, data string) string {
@@ -630,6 +638,9 @@ var flagWebHostPort = flag.Int("webport", 8080, "The TCP port that the server li
 var flagWssHost = flag.String("host", "192.168.2.30", "Enter your hostname or host ip")
 var flagstun = flag.String("stun", "", "Enter stun server ip:port,for example 192.168.2.170:3478,default is null")
 var flagturn = flag.String("turn", "", "Enter turn server ip:port,for example 192.168.2.170:3478,default is null")
+var flagTurnUser = flag.String("turn-username", "", "Enter turn server username,default is null")
+var flagTurnPassword = flag.String("turn-password", "", "Enter turn server user password,default is null")
+var flagTurnSecret = flag.String("turn-static-auth-secret", "", "Enter turn server static auth secret,default is null")
 var roomSrv = flag.String("room-server", "https://appr.tc", "The origin of the room server")
 
 var CERT = flag.String("cert", "./mycert.pem", "cert pem file ")
@@ -643,6 +654,19 @@ func main() {
 	wssHostPort = *flagWssHostPort
 	webHostPort = *flagWebHostPort
 	wssHost = *flagWssHost
+
+	if len(*flagturn) > 0 {
+		if len(*flagTurnUser) == 0 {
+			log.Printf("If set turn server,must has turn-username")
+			return
+		}
+
+		if len(*flagTurnPassword) == 0 && len(*flagTurnSecret) == 0 {
+			log.Printf("If set turn server,must set turn-password or turn-static-auth-secret")
+			return
+		}
+
+	}
 
 	log.Printf("Starting collider: tls = %t, port = %d, room-server=%s", useTls, wssHostPort, *roomSrv)
 

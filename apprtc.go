@@ -63,7 +63,7 @@ var TURN_URL_TEMPLATE string = `"%s/turn?username=%s&key=%s"`
 var CEOD_KEY string = "4080218913"
 
 var ICE_SERVER_BASE_URL string = "https://"
-var ICE_SERVER_URL_TEMPLATE string = `"https://%s:%d/iceconfig?key=%s"`
+var ICE_SERVER_URL_TEMPLATE string = `"%s://%s:%d/iceconfig?key=%s"`
 var ICE_SERVER_API_KEY string = "4080218913" //os.environ.get('ICE_SERVER_API_KEY')
 
 var CALLSTATS_PARAMS string = `{"appSecret": "none", "appId": "none"}`
@@ -213,13 +213,16 @@ func getRequest(r *http.Request, key, def string) string {
 }
 func getWssParameters(r *http.Request) (string, string) {
 	wssHostPortPair := r.Form.Get("wshpp")
-	wssTLS := getRequest(r, "wstls", strconv.FormatBool(useTls))
+	isTLS := isTLS(r)
+	wssTLS := getRequest(r, "wstls", strconv.FormatBool(isTLS))
 	// http://127.0.0.1:8080/?wstls=false&wshpp=192.168.2.97:4443
 
 	if len(wssHostPortPair) == 0 {
 		log.Println("getWssParameters, r.Host:", r.Host)
 		wssHostPortPair = r.Host
-		wssHostPortPair = wssHost + ":" + strconv.Itoa(wssHostPort) // "192.168.2.30:8089"
+		if len(wssHost) > 0 {
+			wssHostPortPair = wssHost //+ ":" + strconv.Itoa(wssHostPort) // "192.168.2.30:8089"
+		}
 	}
 	// log.Println("r:",r)
 	// if strings.Index(r.Scheme,"http://") == 0 {
@@ -228,11 +231,11 @@ func getWssParameters(r *http.Request) (string, string) {
 	// wssTLS = "false"
 	var wssUrl, wssPostUrl string
 	if strings.EqualFold(wssTLS, "false") {
-		wssUrl = "ws://" + wssHostPortPair + "/ws"
-		wssPostUrl = "http://" + wssHostPortPair
+		wssUrl = "ws://" + wssHostPortPair + ":" + strconv.Itoa(wsHostPort) + "/ws"
+		wssPostUrl = "http://" + wssHostPortPair + ":" + strconv.Itoa(httpHostPort)
 	} else {
-		wssUrl = "wss://" + wssHostPortPair + "/ws"
-		wssPostUrl = "https://" + wssHostPortPair
+		wssUrl = "wss://" + wssHostPortPair + ":" + strconv.Itoa(wssHostPort) + "/ws"
+		wssPostUrl = "https://" + wssHostPortPair + ":" + strconv.Itoa(httpHostPort)
 	}
 	return wssUrl, wssPostUrl
 }
@@ -309,6 +312,7 @@ func addClientToRoom(r *http.Request, room_id, client_id string, is_loopback boo
 
 func joinPageHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("joinPageHandler host:", r.Host, "url:", r.URL.RequestURI(), " path:", r.URL.Path, " raw query:", r.URL.RawQuery)
+	log.Println("joinPageHandler host:", r.Host, "TLS:", r.TLS, " path:", r.URL.Path, " raw query:", r.URL.RawQuery)
 	room_id := strings.Replace(r.URL.Path, "/join/", "", 1)
 	room_id = strings.Replace(room_id, "/", "", -1)
 
@@ -542,6 +546,10 @@ func mainPageHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func isTLS(r *http.Request) bool {
+	return (r.TLS != nil)
+}
+
 func getRoomParameters(r *http.Request, room_id, client_id string, is_initiator interface{}) map[string]interface{} {
 
 	var data map[string]interface{}
@@ -571,7 +579,11 @@ func getRoomParameters(r *http.Request, room_id, client_id string, is_initiator 
 	data["turn_url"] = template.JS(fmt.Sprintf(TURN_URL_TEMPLATE, TURN_BASE_URL, username, CEOD_KEY))
 
 	// ice_server_base_url := getRequest(r, "ts", ICE_SERVER_BASE_URL)
-	data["ice_server_url"] = template.JS(fmt.Sprintf(ICE_SERVER_URL_TEMPLATE, wssHost, webHostPort, ICE_SERVER_API_KEY))
+	if isTLS(r) {
+		data["ice_server_url"] = template.JS(fmt.Sprintf(ICE_SERVER_URL_TEMPLATE, "https", wssHost, httpsHostPort, ICE_SERVER_API_KEY))
+	} else {
+		data["ice_server_url"] = template.JS(fmt.Sprintf(ICE_SERVER_URL_TEMPLATE, "http", wssHost, httpHostPort, ICE_SERVER_API_KEY))
+	}
 
 	data["ice_server_transports"] = getRequest(r, "tt", "")
 
@@ -606,7 +618,7 @@ func getRoomParameters(r *http.Request, room_id, client_id string, is_initiator 
 
 	if len(room_id) > 0 {
 		var room_link string
-		if useTls {
+		if isTLS(r) {
 			room_link = "https://" + r.Host + "/r/" + room_id + "?" + r.URL.RawQuery
 		} else {
 			room_link = "http://" + r.Host + "/r/" + room_id + "?" + r.URL.RawQuery
@@ -627,14 +639,18 @@ func getRoomParameters(r *http.Request, room_id, client_id string, is_initiator 
 	return data
 }
 
-var useTls bool
+// var useTls bool
 var wssHostPort int
-var webHostPort int
+var wsHostPort int
+var httpsHostPort int
+var httpHostPort int
 var wssHost string
 
-var flagUseTls = flag.Bool("tls", true, "whether TLS is used")
-var flagWssHostPort = flag.Int("wsport", 443, "The TCP port that the server listens on")
-var flagWebHostPort = flag.Int("webport", 8080, "The TCP port that the server listens on")
+// var flagUseTls = flag.Bool("tls", true, "whether TLS is used")
+var flagWssHostPort = flag.Int("wssport", 1443, "The TCP port that the server listens on")
+var flagWsHostPort = flag.Int("wsport", 2443, "The TCP port that the server listens on")
+var flagHttpsHostPort = flag.Int("httpsport", 8888, "The TCP port that the server listens on")
+var flagHttpHostPort = flag.Int("httpport", 8080, "The TCP port that the server listens on")
 var flagWssHost = flag.String("host", "192.168.2.30", "Enter your hostname or host ip")
 var flagstun = flag.String("stun", "", "Enter stun server ip:port,for example 192.168.2.170:3478,default is null")
 var flagturn = flag.String("turn", "", "Enter turn server ip:port,for example 192.168.2.170:3478,default is null")
@@ -650,9 +666,11 @@ var ice_server_url string
 
 func main() {
 	flag.Parse()
-	useTls = *flagUseTls
+	// useTls = *flagUseTls
 	wssHostPort = *flagWssHostPort
-	webHostPort = *flagWebHostPort
+	wsHostPort = *flagWsHostPort
+	httpsHostPort = *flagHttpsHostPort
+	httpHostPort = *flagHttpHostPort
 	wssHost = *flagWssHost
 
 	if len(*flagturn) > 0 {
@@ -668,7 +686,7 @@ func main() {
 
 	}
 
-	log.Printf("Starting collider: tls = %t, port = %d, room-server=%s", useTls, wssHostPort, *roomSrv)
+	// log.Printf("Starting collider: port = %d, room-server=%s", wssHostPort, *roomSrv)
 
 	// TURN_SERVER_OVERRIDE += "["
 	// if len(*flagstun) > 0 {
@@ -684,7 +702,7 @@ func main() {
 
 	log.Printf("TURN_SERVER_OVERRIDE:%s", TURN_SERVER_OVERRIDE)
 	c := collider.NewCollider(*roomSrv)
-	go c.Run(wssHostPort, useTls, *CERT, *KEY)
+	go c.Run(wssHostPort, wsHostPort, *CERT, *KEY)
 
 	RoomList = make(map[string]*Room)
 	WebServeMux := http.NewServeMux()
@@ -708,11 +726,12 @@ func main() {
 
 	var e error
 
-	pstr := ":" + strconv.Itoa(webHostPort)
-	log.Println("Starting webrtc demo on port:", webHostPort, " tls:", useTls)
+	httpsPstr := ":" + strconv.Itoa(httpsHostPort)
+	httpPstr := ":" + strconv.Itoa(httpHostPort)
+	// log.Println("Starting webrtc demo on port:", webHostPort, " tls:", useTls)
 	//    1Dj9XZ5fwvKS6YoQZOoORcFnXaI=
 	// log.Println("hmac:", Hmac("my_secret", "1433895918506:my_user_name"))
-	if useTls {
+	if len(*CERT) > 0 && len(*KEY) > 0 {
 		config := &tls.Config{
 			// Only allow ciphers that support forward secrecy for iOS9 compatibility:
 			// https://developer.apple.com/library/prerelease/ios/technotes/App-Transport-Security-Technote/
@@ -727,13 +746,13 @@ func main() {
 			},
 			PreferServerCipherSuites: true,
 		}
-		server := &http.Server{Addr: pstr, Handler: WebServeMux, TLSConfig: config}
-
-		e = server.ListenAndServeTLS(*CERT, *KEY)
-	} else {
-		e = http.ListenAndServe(pstr, WebServeMux)
+		log.Println("Starting webrtc demo on https port:", httpsHostPort)
+		server := &http.Server{Addr: httpsPstr, Handler: WebServeMux, TLSConfig: config}
+		go server.ListenAndServeTLS(*CERT, *KEY)
 	}
 
+	log.Println("Starting webrtc demo on http port:", httpHostPort)
+	e = http.ListenAndServe(httpPstr, WebServeMux)
 	if e != nil {
 		log.Fatal("Run: " + e.Error())
 	}

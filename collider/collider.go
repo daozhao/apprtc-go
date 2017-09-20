@@ -41,15 +41,16 @@ func NewCollider(rs string) *Collider {
 }
 
 // Run starts the collider server and blocks the thread until the program exits.
-func (c *Collider) Run(p int, useTls bool, pem, key string) {
+func (c *Collider) Run(wssPort int, wsPort int, pem, key string) {
 	http.Handle("/ws", websocket.Handler(c.wsHandler))
 	http.HandleFunc("/status", c.httpStatusHandler)
 	http.HandleFunc("/", c.httpHandler)
 
 	var e error
 
-	pstr := ":" + strconv.Itoa(p)
-	if useTls {
+	wssPstr := ":" + strconv.Itoa(wssPort)
+	wsPstr := ":" + strconv.Itoa(wsPort)
+	if len(pem) > 0 && len(key) > 0 {
 		config := &tls.Config{
 			// Only allow ciphers that support forward secrecy for iOS9 compatibility:
 			// https://developer.apple.com/library/prerelease/ios/technotes/App-Transport-Security-Technote/
@@ -64,13 +65,15 @@ func (c *Collider) Run(p int, useTls bool, pem, key string) {
 			},
 			PreferServerCipherSuites: true,
 		}
-		server := &http.Server{Addr: pstr, Handler: nil, TLSConfig: config}
+		server := &http.Server{Addr: wssPstr, Handler: nil, TLSConfig: config}
 
+		log.Println("Starting collider on wss port:", wssPort)
 		// e = server.ListenAndServeTLS("./mycert.pem", "./mycert.key")
-		e = server.ListenAndServeTLS(pem, key)
-	} else {
-		e = http.ListenAndServe(pstr, nil)
+		go server.ListenAndServeTLS(pem, key)
 	}
+
+	log.Println("Starting collider on ws port:", wsPort)
+	e = http.ListenAndServe(wsPstr, nil)
 
 	if e != nil {
 		log.Fatal("Run: " + e.Error())

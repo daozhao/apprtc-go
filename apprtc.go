@@ -285,7 +285,7 @@ func addClientToRoom(r *http.Request, room_id, client_id string, is_loopback boo
 		if is_loopback {
 			room.AddClient(NewClient(LOOPBACK_CLIENT_ID, false))
 		}
-		messages = make([]string, 1)
+		messages = make([]string, 0)
 
 	} else {
 		is_initiator = false

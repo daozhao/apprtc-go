@@ -21,7 +21,6 @@ go build -o apprtc-go apprtc.go
 Open chrome and enter URL(https://XXX.XXX.XXX.XXX:8888 or https://XXX.XXX.XXX.XXX:8080 ).
 
 warnning:Replace the IP(XXX.XXX.XXX.XXX) with your real IP address.
-Please put two devices in different networks so that they cannot access each other.
 
 # Other test
 1. Only test stun
@@ -50,6 +49,7 @@ turnserver -v  --user=daozhao  --realm apprtc --static-auth-secret=654321  --no-
             -httpport=8080 -httpsport=8888 \
             -turn=192.168.2.170:3478 -turn-username=daozhao -turn-static-auth-secret=654321 
 ```
+warnning:Please put two devices in different networks so that they cannot access each other.
 
 # Help
 ```

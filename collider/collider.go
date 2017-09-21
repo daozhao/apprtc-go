@@ -40,6 +40,12 @@ func NewCollider(rs string) *Collider {
 	}
 }
 
+func (c *Collider) AddHandle(WebServeMux *http.ServeMux) {
+	WebServeMux.Handle("/ws", websocket.Handler(c.wsHandler))
+	WebServeMux.HandleFunc("/status", c.httpStatusHandler)
+	WebServeMux.HandleFunc("/collider", c.httpHandler)
+}
+
 // Run starts the collider server and blocks the thread until the program exits.
 func (c *Collider) Run(wssPort int, wsPort int, pem, key string) {
 	http.Handle("/ws", websocket.Handler(c.wsHandler))

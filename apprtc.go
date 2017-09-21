@@ -63,7 +63,7 @@ var TURN_URL_TEMPLATE string = `"%s/turn?username=%s&key=%s"`
 var CEOD_KEY string = "4080218913"
 
 var ICE_SERVER_BASE_URL string = "https://"
-var ICE_SERVER_URL_TEMPLATE string = `"%s://%s:%d/iceconfig?key=%s"`
+var ICE_SERVER_URL_TEMPLATE string = `"%s://%s/iceconfig?key=%s"`
 var ICE_SERVER_API_KEY string = "4080218913" //os.environ.get('ICE_SERVER_API_KEY')
 
 var CALLSTATS_PARAMS string = `{"appSecret": "none", "appId": "none"}`
@@ -212,30 +212,35 @@ func getRequest(r *http.Request, key, def string) string {
 	return value
 }
 func getWssParameters(r *http.Request) (string, string) {
-	wssHostPortPair := r.Form.Get("wshpp")
-	isTLS := isTLS(r)
-	wssTLS := getRequest(r, "wstls", strconv.FormatBool(isTLS))
-	// http://127.0.0.1:8080/?wstls=false&wshpp=192.168.2.97:4443
+	// wssHostPortPair := r.Form.Get("wshpp")
+	// isTLS := isTLS(r)
+	// wssTLS := getRequest(r, "wstls", strconv.FormatBool(isTLS))
+	// // http://127.0.0.1:8080/?wstls=false&wshpp=192.168.2.97:4443
 
-	if len(wssHostPortPair) == 0 {
-		log.Println("getWssParameters, r.Host:", r.Host)
-		wssHostPortPair = r.Host
-		if len(wssHost) > 0 {
-			wssHostPortPair = wssHost //+ ":" + strconv.Itoa(wssHostPort) // "192.168.2.30:8089"
-		}
-	}
+	// if len(wssHostPortPair) == 0 {
+	// 	log.Println("getWssParameters, r.Host:", r.Host)
+	// 	wssHostPortPair = r.Host
+	// 	if len(wssHost) > 0 {
+	// 		wssHostPortPair = wssHost //+ ":" + strconv.Itoa(wssHostPort) // "192.168.2.30:8089"
+	// 	}
+	// }
 	// log.Println("r:",r)
 	// if strings.Index(r.Scheme,"http://") == 0 {
 	// 	wssTLS = "false"
 	// }
 	// wssTLS = "false"
 	var wssUrl, wssPostUrl string
-	if strings.EqualFold(wssTLS, "false") {
-		wssUrl = "ws://" + wssHostPortPair + ":" + strconv.Itoa(wsHostPort) + "/ws"
-		wssPostUrl = "http://" + wssHostPortPair + ":" + strconv.Itoa(httpHostPort)
+	// if strings.EqualFold(wssTLS, "false") {
+	if !isTLS(r) {
+		// wssUrl = "ws://" + r.Host + ":" + strconv.Itoa(wsHostPort) + "/ws"
+		// wssPostUrl = "http://" + r.Host + ":" + strconv.Itoa(httpHostPort)
+		wssUrl = "ws://" + r.Host + "/ws"
+		wssPostUrl = "http://" + r.Host
 	} else {
-		wssUrl = "wss://" + wssHostPortPair + ":" + strconv.Itoa(wssHostPort) + "/ws"
-		wssPostUrl = "https://" + wssHostPortPair + ":" + strconv.Itoa(httpHostPort)
+		// wssUrl = "wss://" + r.Host + ":" + strconv.Itoa(wssHostPort) + "/ws"
+		// wssPostUrl = "https://" + r.Host + ":" + strconv.Itoa(httpHostPort)
+		wssUrl = "wss://" + r.Host + "/ws"
+		wssPostUrl = "https://" + r.Host
 	}
 	return wssUrl, wssPostUrl
 }
@@ -580,9 +585,11 @@ func getRoomParameters(r *http.Request, room_id, client_id string, is_initiator 
 
 	// ice_server_base_url := getRequest(r, "ts", ICE_SERVER_BASE_URL)
 	if isTLS(r) {
-		data["ice_server_url"] = template.JS(fmt.Sprintf(ICE_SERVER_URL_TEMPLATE, "https", wssHost, httpsHostPort, ICE_SERVER_API_KEY))
+		// data["ice_server_url"] = template.JS(fmt.Sprintf(ICE_SERVER_URL_TEMPLATE, "https", r.Host, httpsHostPort, ICE_SERVER_API_KEY))
+		data["ice_server_url"] = template.JS(fmt.Sprintf(ICE_SERVER_URL_TEMPLATE, "https", r.Host, ICE_SERVER_API_KEY))
 	} else {
-		data["ice_server_url"] = template.JS(fmt.Sprintf(ICE_SERVER_URL_TEMPLATE, "http", wssHost, httpHostPort, ICE_SERVER_API_KEY))
+		// data["ice_server_url"] = template.JS(fmt.Sprintf(ICE_SERVER_URL_TEMPLATE, "http", r.Host, httpHostPort, ICE_SERVER_API_KEY))
+		data["ice_server_url"] = template.JS(fmt.Sprintf(ICE_SERVER_URL_TEMPLATE, "http", r.Host, ICE_SERVER_API_KEY))
 	}
 
 	data["ice_server_transports"] = getRequest(r, "tt", "")
@@ -644,14 +651,16 @@ var wssHostPort int
 var wsHostPort int
 var httpsHostPort int
 var httpHostPort int
-var wssHost string
+
+// var wssHost string
 
 // var flagUseTls = flag.Bool("tls", true, "whether TLS is used")
-var flagWssHostPort = flag.Int("wssport", 1443, "The TCP port that the server listens on")
-var flagWsHostPort = flag.Int("wsport", 2443, "The TCP port that the server listens on")
+// var flagWssHostPort = flag.Int("wssport", 1443, "The TCP port that the server listens on")
+// var flagWsHostPort = flag.Int("wsport", 2443, "The TCP port that the server listens on")
 var flagHttpsHostPort = flag.Int("httpsport", 8888, "The TCP port that the server listens on")
 var flagHttpHostPort = flag.Int("httpport", 8080, "The TCP port that the server listens on")
-var flagWssHost = flag.String("host", "192.168.2.30", "Enter your hostname or host ip")
+
+// var flagWssHost = flag.String("host", "192.168.2.30", "Enter your hostname or host ip")
 var flagstun = flag.String("stun", "", "Enter stun server ip:port,for example 192.168.2.170:3478,default is null")
 var flagturn = flag.String("turn", "", "Enter turn server ip:port,for example 192.168.2.170:3478,default is null")
 var flagTurnUser = flag.String("turn-username", "", "Enter turn server username,default is null")
@@ -667,11 +676,11 @@ var ice_server_url string
 func main() {
 	flag.Parse()
 	// useTls = *flagUseTls
-	wssHostPort = *flagWssHostPort
-	wsHostPort = *flagWsHostPort
+	// wssHostPort = *flagWssHostPort
+	// wsHostPort = *flagWsHostPort
 	httpsHostPort = *flagHttpsHostPort
 	httpHostPort = *flagHttpHostPort
-	wssHost = *flagWssHost
+	// wssHost = *flagWssHost
 
 	if len(*flagturn) > 0 {
 		if len(*flagTurnUser) == 0 {
@@ -686,8 +695,6 @@ func main() {
 
 	}
 
-	// log.Printf("Starting collider: port = %d, room-server=%s", wssHostPort, *roomSrv)
-
 	// TURN_SERVER_OVERRIDE += "["
 	// if len(*flagstun) > 0 {
 	// 	TURN_SERVER_OVERRIDE += fmt.Sprintf(STUN_SERVER_FMT, *flagstun)
@@ -699,10 +706,7 @@ func main() {
 	// 	TURN_SERVER_OVERRIDE += fmt.Sprintf(TURN_SERVER_FMT, *flagturn)
 	// }
 	TURN_SERVER_OVERRIDE = "[" + TURN_SERVER_OVERRIDE + "]"
-
-	log.Printf("TURN_SERVER_OVERRIDE:%s", TURN_SERVER_OVERRIDE)
-	c := collider.NewCollider(*roomSrv)
-	go c.Run(wssHostPort, wsHostPort, *CERT, *KEY)
+	// log.Printf("TURN_SERVER_OVERRIDE:%s", TURN_SERVER_OVERRIDE)
 
 	RoomList = make(map[string]*Room)
 	WebServeMux := http.NewServeMux()
@@ -723,6 +727,10 @@ func main() {
 	WebServeMux.HandleFunc("/iceconfig", iceconfigPageHandler)
 	WebServeMux.HandleFunc("/iceconfig/", iceconfigPageHandler)
 	WebServeMux.HandleFunc("/", mainPageHandler)
+
+	c := collider.NewCollider(*roomSrv)
+	c.AddHandle(WebServeMux)
+	// go c.Run(wssHostPort, wsHostPort, *CERT, *KEY)
 
 	var e error
 

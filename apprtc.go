@@ -657,8 +657,8 @@ var httpHostPort int
 // var flagUseTls = flag.Bool("tls", true, "whether TLS is used")
 // var flagWssHostPort = flag.Int("wssport", 1443, "The TCP port that the server listens on")
 // var flagWsHostPort = flag.Int("wsport", 2443, "The TCP port that the server listens on")
-var flagHttpsHostPort = flag.Int("httpsport", 8888, "The TCP port that the server listens on")
-var flagHttpHostPort = flag.Int("httpport", 8080, "The TCP port that the server listens on")
+var flagHttpsHostPort = flag.Int("httpsport", 8888, "The https port that the server listens on")
+var flagHttpHostPort = flag.Int("httpport", 8080, "The http port that the server listens on")
 
 // var flagWssHost = flag.String("host", "192.168.2.30", "Enter your hostname or host ip")
 var flagstun = flag.String("stun", "", "Enter stun server ip:port,for example 192.168.2.170:3478,default is null")

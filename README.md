@@ -58,9 +58,9 @@ Usage of /home/daozhao/Documents/SourceCode/goPath/bin/apprtc-go:
   -cert string
     	cert pem file  (default "./mycert.pem")
   -httpport int
-    	The TCP port that the server listens on (default 8080)
+    	The http port that the server listens on (default 8080)
   -httpsport int
-    	The TCP port that the server listens on (default 8888)
+    	The https port that the server listens on (default 8888)
   -key string
     	cert key file  (default "./mycert.key")
   -room-server string

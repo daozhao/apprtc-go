@@ -473,6 +473,12 @@ func messagePageHandler(w http.ResponseWriter, r *http.Request) {
 }
 func paramsPageHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("paramsPageHandler host:", r.Host, "url:", r.URL.RequestURI(), " path:", r.URL.Path, " raw query:", r.URL.RawQuery)
+	data := getRoomParameters(r, "", "", nil)
+	enc := json.NewEncoder(w)
+	enc.Encode(&data)
+}
+func paramsHTMLPageHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("paramsHTMLPageHandler host:", r.Host, "url:", r.URL.RequestURI(), " path:", r.URL.Path, " raw query:", r.URL.RawQuery)
 	t, _ := template.ParseFiles("./html/params.html")
 	t.Execute(w, nil)
 
@@ -721,6 +727,9 @@ func main() {
 	WebServeMux.HandleFunc("/join/", joinPageHandler)
 	WebServeMux.HandleFunc("/leave/", leavePageHandler)
 	WebServeMux.HandleFunc("/message/", messagePageHandler)
+	WebServeMux.HandleFunc("/params.html", paramsHTMLPageHandler)
+	WebServeMux.HandleFunc("/params.htm" , paramsHTMLPageHandler)
+	WebServeMux.HandleFunc("/params", paramsPageHandler)
 	WebServeMux.HandleFunc("/params/", paramsPageHandler)
 	WebServeMux.HandleFunc("/a/", aPageHandler)
 	WebServeMux.HandleFunc("/compute/", computePageHandler)

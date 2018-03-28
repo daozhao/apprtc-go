@@ -2,7 +2,7 @@
 # apprtc-go
 这个项目是使用golang重写apprtc[https://github.com/webrtc/apprtc],为了方便在自有服务器部署，无须安装Google App Engine.
 
-＃ cotrun使用
+# cotrun使用
 coturn[https://github.com/coturn/coturn]是一个开源的turn/stun的服务器，大家可以使用它进行webrtc的测试搭建。当然也可以用于生产环境。此文只是介绍其用于测试环境如何配置其用户于验证。这里可以配合apprtc-go[https://github.com/daozhao/apprtc-go]的测试进行说明。
 
 coturn服务器是包括了turn和stun这两个服务的。如果你只需要stun服务。按照下边的命令启动就可以。（假设turn服务器和apprtc-go服务器都运行在192.168.2.170上）

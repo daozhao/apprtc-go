@@ -254,11 +254,24 @@ func roomPageHandler(w http.ResponseWriter, r *http.Request) {
 	// t, err := template.ParseFiles("./html/params.html")
 	if err != nil {
 		log.Println(err)
+		log.Println("index template render error:",err.Error())
+		w.WriteHeader(500)
+		w.Write([]byte(err.Error()))
+		return
 	}
 	room, ok := RoomList[room_id]
+
 	if ok {
 		if room.GetOccupancy() >= 2 {
 			t, err = template.ParseFiles("./html/full_template.html")
+			if err!=nil{
+
+				log.Println("full template render error:",err.Error())
+				w.WriteHeader(500)
+				w.Write([]byte(err.Error()))
+				return
+
+			}
 			t.Execute(w, nil)
 			return
 
